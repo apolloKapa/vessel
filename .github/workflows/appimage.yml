@@ -1,6 +1,6 @@
 name: AppImage
 
-# Pushing a v* tag builds Hangar-x86_64.AppImage and attaches it to a release for that tag.
+# Pushing a v* tag builds Vessel-x86_64.AppImage and attaches it to a release for that tag.
 # Running it by hand (Actions -> AppImage -> Run workflow) only uploads it as a build artifact.
 on:
   push:
@@ -38,24 +38,24 @@ jobs:
         env:
           APPIMAGETOOL: ${{ github.workspace }}/appimagetool
           APPIMAGE_EXTRACT_AND_RUN: "1"
-          HANGAR_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          VESSEL_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: ./build_appimage.sh
 
       - name: Smoke test
         run: |
-          ./dist/Hangar-x86_64.AppImage --appimage-extract >/dev/null
+          ./dist/Vessel-x86_64.AppImage --appimage-extract >/dev/null
           ./squashfs-root/AppRun --version
           ./squashfs-root/usr/bin/bsdtar --version
 
       - uses: actions/upload-artifact@v5
         with:
-          name: Hangar-x86_64.AppImage
-          path: dist/Hangar-x86_64.AppImage
+          name: Vessel-x86_64.AppImage
+          path: dist/Vessel-x86_64.AppImage
 
       - name: Attach to release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Hangar $GITHUB_REF_NAME" --notes "Game and app launcher for Linux: run games from outside Steam with GE-Proton, any other Proton, Wine or natively. Download Hangar-x86_64.AppImage, make it executable (chmod +x) and run it."
-          gh release upload "$GITHUB_REF_NAME" dist/Hangar-x86_64.AppImage --clobber
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Vessel $GITHUB_REF_NAME" --notes "Game and app launcher for Linux: run games from outside Steam with GE-Proton, any other Proton, Wine or natively. Download Vessel-x86_64.AppImage, make it executable (chmod +x) and run it."
+          gh release upload "$GITHUB_REF_NAME" dist/Vessel-x86_64.AppImage --clobber

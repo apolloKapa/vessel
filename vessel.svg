@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22202e"/>
+      <stop offset="1" stop-color="#121118"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5ee7df"/>
+      <stop offset="0.55" stop-color="#7f8cff"/>
+      <stop offset="1" stop-color="#b06cff"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.62" r="0.5">
+      <stop offset="0" stop-color="#7f8cff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7f8cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#tile)"/>
+  <circle cx="32" cy="39" r="24" fill="url(#glow)"/>
+  <!-- the liquid, with a gentle wave on top -->
+  <path d="M17.46 32 C22 29.5 26 34.5 32 32 C38 29.5 42 34.5 46.54 32 A16.5 16.5 0 1 1 17.46 32 Z" fill="url(#liquid)"/>
+  <!-- the flask -->
+  <path d="M27 9 H37 V22.5 A18 18 0 1 1 27 22.5 Z" fill="none" stroke="#e8e8f2" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="24.5" y="7" width="15" height="4" rx="2" fill="#e8e8f2"/>
+  <!-- play -->
+  <path d="M28.5 36.5 L39.5 43 L28.5 49.5 Z" fill="#ffffff" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- a highlight on the glass -->
+  <path d="M19.2 29.5 A14 14 0 0 1 24.5 25" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="2" stroke-linecap="round"/>
+</svg>

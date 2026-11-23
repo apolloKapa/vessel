@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hangar: a launcher for the games and apps you have outside Steam.
+"""Vessel: a launcher for the games and apps you have outside Steam.
 
 Add anything you can run: a Windows .exe (run through Proton, GE-Proton by default, or Wine), a
 native binary, an AppImage, a script or a plain command such as `flatpak run ...`. Each Windows
@@ -7,16 +7,16 @@ program gets its own prefix. Games and apps have separate tabs, each with its li
 NSFW and hidden lists, shown as a list or a grid of covers. Covers come from the Steam store or
 SteamGridDB (with your own API key) or any image file; Windows programs also get their .exe icon.
 
-Everything Hangar knows is in ~/.config/hangar (library.json, settings.json) and
-~/.local/share/hangar (covers, icons, logs, prefixes of its own runners). Games keep their own
+Everything Vessel knows is in ~/.config/vessel (library.json, settings.json) and
+~/.local/share/vessel (covers, icons, logs, prefixes of its own runners). Games keep their own
 files where they are.
 
-  hangar                 open the window
-  hangar --launch ID     run one entry without the window (used by menu shortcuts)
-  hangar FILE.exe        open a Windows program (or --open FILE): a small window to run it, pick
+  vessel                 open the window
+  vessel --launch ID     run one entry without the window (used by menu shortcuts)
+  vessel FILE.exe        open a Windows program (or --open FILE): a small window to run it, pick
                          Proton/Wine and optionally add it to the library, like PortProton
-  hangar --run FILE      run a program right away with the default runner, no window
-  hangar --check         list the Proton/Wine versions and tools Hangar finds
+  vessel --run FILE      run a program right away with the default runner, no window
+  vessel --check         list the Proton/Wine versions and tools Vessel finds
 """
 import hashlib
 import json
@@ -45,10 +45,10 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QColorDialog
                              QKeySequenceEdit, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                              QScrollArea, QSizePolicy, QSystemTrayIcon, QToolButton, QVBoxLayout, QWidget)
 
-VERSION = "1.9.1"
+VERSION = "2.0.0"
 HOME = os.path.expanduser("~")
-CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "hangar")
-DATA = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "hangar")
+CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "vessel")
+DATA = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "vessel")
 LIBRARY = os.path.join(CONF_DIR, "library.json")
 SETTINGS = os.path.join(CONF_DIR, "settings.json")
 COVERS = os.path.join(DATA, "covers")
@@ -58,17 +58,17 @@ RUNNERS = os.path.join(DATA, "runners")
 TOOLS = os.path.join(DATA, "tools")
 MENU_DIR = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "applications")
 HERE = os.path.dirname(os.path.abspath(__file__))
-ICON = os.path.join(HERE, "hangar.svg")
+ICON = os.path.join(HERE, "vessel.svg")
 WINDOWS_EXT = (".exe", ".msi", ".bat", ".cmd", ".lnk")
 IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.webp *.bmp *.ico *.svg)"
 STEAM_ROOTS = [os.path.join(HOME, ".steam/root"), os.path.join(HOME, ".local/share/Steam"),
                os.path.join(HOME, ".steam/steam"),
                os.path.join(HOME, ".var/app/com.valvesoftware.Steam/.local/share/Steam")]
 GE_RELEASES = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest"
-HANGAR_RELEASES = "https://api.github.com/repos/apolloKapa/hangar/releases/latest"
-HANGAR_PAGE = "https://github.com/apolloKapa/hangar/releases/latest"
+VESSEL_RELEASES = "https://api.github.com/repos/apolloKapa/vessel/releases/latest"
+VESSEL_PAGE = "https://github.com/apolloKapa/vessel/releases/latest"
 DW_RELEASES = "https://dawn.wine/api/v1/repos/dawn-winery/dwproton/releases/latest"
-# Protons Hangar can download: key -> (label, latest-release API, archive suffix)
+# Protons Vessel can download: key -> (label, latest-release API, archive suffix)
 PROTON_SOURCES = {"ge": ("GE-Proton", GE_RELEASES, ".tar.gz"), "dw": ("DWProton", DW_RELEASES, ".tar.xz")}
 WINETRICKS_URL = "https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
 KINDS = {"game": "Games", "app": "Apps"}
@@ -103,7 +103,7 @@ def write_json(path, value):
 DEFAULT_SETTINGS = {
     "theme": "Midnight", "accent": "", "view": "grid", "size": "medium", "kind": "game", "tab": "library",
     "sort": "name", "proton": "", "wine": "", "windows_runner": "proton",
-    "prefix_root": os.path.join(HOME, "Games", "Hangar", "prefixes"), "use_umu": True,
+    "prefix_root": os.path.join(HOME, "Games", "Vessel", "prefixes"), "use_umu": True,
     "show_nsfw": False, "blur_nsfw": True, "sgdb_key": "", "vr_options": "", "start_wivrn": True, "wayland": "auto", "games_root": os.path.join(HOME, "Games"),
     "exe_opener": False, "close_to_tray": True,
     # NSFW privacy: hide the tab (a key combination shows it), and a password to open it
@@ -254,7 +254,7 @@ def guess_name(path):
 # ---- environment and runners ---------------------------------------------------------------------
 
 def host_env():
-    """the environment for anything Hangar starts: without the AppImage's own libraries and paths"""
+    """the environment for anything Vessel starts: without the AppImage's own libraries and paths"""
     env = dict(os.environ)
     if getattr(sys, "frozen", False):
         # PyInstaller points LD_LIBRARY_PATH (and others) at the bundle and keeps the old value in KEY_ORIG
@@ -271,9 +271,9 @@ def host_env():
                     "TK_LIBRARY"):
             env.pop(key, None)
     for key in [k for k in env if k.startswith(("_PYI", "_MEI"))] + ["APPDIR", "APPIMAGE", "ARGV0", "OWD",
-                                                                    "HANGAR_BSDTAR"]:
+                                                                    "VESSEL_BSDTAR"]:
         env.pop(key, None)
-    # Hangar's own tools (a downloaded winetricks) come last, after the system's
+    # Vessel's own tools (a downloaded winetricks) come last, after the system's
     env["PATH"] = env.get("PATH", "/usr/bin:/bin") + ":" + os.path.join(TOOLS, "bin")
     return env
 
@@ -291,6 +291,25 @@ def steam_root():
         if os.path.isdir(os.path.join(root, "steamapps")):
             return os.path.realpath(root)
     return None
+
+
+def uses_steamworks(exe):
+    """True when a Windows game ships the Steamworks DLL (steam_api.dll / steam_api64.dll) beside its .exe or
+    in a Unity/Unreal plugin folder: many quit at once when Steam can't be reached"""
+    if not os.path.isfile(exe):
+        return False
+    root = os.path.dirname(exe)
+    names = {"steam_api.dll", "steam_api64.dll"}
+    base = len(root.rstrip(os.sep).split(os.sep))
+    try:
+        for folder, dirs, files in os.walk(root):
+            if names & {f.lower() for f in files}:
+                return True
+            if len(folder.rstrip(os.sep).split(os.sep)) - base >= 4:
+                dirs[:] = []
+    except OSError:
+        pass
+    return False
 
 
 def steam_libraries():
@@ -360,7 +379,7 @@ _wine_label = {}
 
 
 def wine_versions():
-    """every Wine on this PC: the system's, then Lutris/Heroic/Bottles/Hangar runners: [{name, path}]"""
+    """every Wine on this PC: the system's, then Lutris/Heroic/Bottles/Vessel runners: [{name, path}]"""
     out, seen = [], set()
     system = which("wine")
     if system:
@@ -703,6 +722,11 @@ def build_command(e, s=None, target=None, extra=None, tool=False):
         prefix = prefix_of(e, s)
         run = windows_cmd(exe) + args
         umu = which("umu-run") if s["use_umu"] else None
+        if umu and steam_root() and uses_steamworks(exe):
+            # umu-run blanks STEAM_COMPAT_CLIENT_INSTALL_PATH, so Proton never puts its Steam bridge
+            # (steamclient64.dll) into the prefix and SteamAPI_Init fails: such games open and close again
+            # (Granny: Legacy). Plain Proton with the Steam folder set reaches the Steam client you're running
+            umu = None
         if umu:
             env.update(WINEPREFIX=os.path.join(prefix, "pfx"), PROTONPATH=proton, GAMEID="umu-0", STORE="none")
             cmd = [umu] + run
@@ -1135,7 +1159,7 @@ def unique_dir(parent, name):
 
 
 def bsdtar():
-    return os.environ.get("HANGAR_BSDTAR") if os.path.isfile(os.environ.get("HANGAR_BSDTAR") or "") \
+    return os.environ.get("VESSEL_BSDTAR") if os.path.isfile(os.environ.get("VESSEL_BSDTAR") or "") \
         else which("bsdtar")
 
 
@@ -1200,7 +1224,7 @@ def flatten(folder):
     items = [i for i in os.listdir(folder) if i not in ("__MACOSX",)]
     if len(items) != 1 or not os.path.isdir(os.path.join(folder, items[0])):
         return
-    tmp = os.path.join(folder, f".hangar-{uuid.uuid4().hex[:6]}")
+    tmp = os.path.join(folder, f".vessel-{uuid.uuid4().hex[:6]}")
     os.rename(os.path.join(folder, items[0]), tmp)
     for item in os.listdir(tmp):
         shutil.move(os.path.join(tmp, item), os.path.join(folder, item))
@@ -1292,11 +1316,11 @@ def game_folder(e):
 # ---- menu shortcuts ----------------------------------------------------------------------------
 
 # ---- opening programs from the file manager ---------------------------------------------------------
-# Windows programs' MIME types: Hangar can be the app that opens them (double-click an .exe and it runs)
+# Windows programs' MIME types: Vessel can be the app that opens them (double-click an .exe and it runs)
 EXE_MIMES = ["application/x-ms-dos-executable", "application/x-msdownload", "application/x-msi",
              "application/x-ms-shortcut", "application/vnd.microsoft.portable-executable", "application/x-dosexec",
              "application/x-ms-ne-executable", "application/x-bat", "application/x-msdos-program"]
-OPENER = os.path.join(MENU_DIR, "hangar-open.desktop")
+OPENER = os.path.join(MENU_DIR, "vessel-open.desktop")
 
 
 def entry_for_path(path):
@@ -1324,15 +1348,15 @@ def quick_entry(path, s=None):
 
 
 def register_opener(on):
-    """Hangar opens Windows programs (or stops doing so): a hidden menu entry for their MIME types,
+    """Vessel opens Windows programs (or stops doing so): a hidden menu entry for their MIME types,
     made the default for them"""
     if on:
         os.makedirs(MENU_DIR, exist_ok=True)
         with open(OPENER, "w", encoding="utf-8") as f:
-            f.write("[Desktop Entry]\nType=Application\nName=Hangar\nGenericName=Run with Hangar\n"
+            f.write("[Desktop Entry]\nType=Application\nName=Vessel\nGenericName=Run with Vessel\n"
                     "Comment=Run this Windows program with Proton or Wine\n"
                     f"Exec={shlex.join(self_command() + ['--open'])} %f\n"
-                    "Icon=hangar\nTerminal=false\nNoDisplay=true\nStartupWMClass=hangar\n"
+                    "Icon=vessel\nTerminal=false\nNoDisplay=true\nStartupWMClass=vessel\n"
                     f"MimeType={';'.join(EXE_MIMES)};\n")
         if which("xdg-mime"):
             subprocess.run(["xdg-mime", "default", os.path.basename(OPENER)] + EXE_MIMES, env=host_env(),
@@ -1358,9 +1382,9 @@ def register_opener(on):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
 
-def restart_hangar():
-    """starts a fresh Hangar (the updated AppImage) and quits this one"""
-    if INSTANCE:  # let the new one become the running Hangar instead of handing over to this one
+def restart_vessel():
+    """starts a fresh Vessel (the updated AppImage) and quits this one"""
+    if INSTANCE:  # let the new one become the running Vessel instead of handing over to this one
         INSTANCE.close()
     subprocess.Popen(self_command(), env=os.environ.copy(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, start_new_session=True)
@@ -1391,14 +1415,15 @@ def desktop_dir():
 
 
 def desktop_shortcut_path(e):
-    """the desktop file for this entry; found by its X-Hangar-Id so a renamed entry keeps its file"""
+    """the desktop file for this entry; found by its X-Vessel-Id so a renamed entry keeps its file"""
     folder = desktop_dir()
     try:
         for fn in os.listdir(folder):
             if fn.endswith(".desktop"):
                 try:
                     with open(os.path.join(folder, fn), encoding="utf-8", errors="replace") as f:
-                        if f"\nX-Hangar-Id={e['id']}\n" in f.read(4096):
+                        head = f.read(4096)
+                        if f"\nX-Vessel-Id={e['id']}\n" in head or f"\nX-Hangar-Id={e['id']}\n" in head:
                             return os.path.join(folder, fn)
                 except OSError:
                     pass
@@ -1410,7 +1435,7 @@ def desktop_shortcut_path(e):
 def shortcut_path(e, where="menu"):
     if where == "desktop":
         return desktop_shortcut_path(e) or ""
-    return os.path.join(MENU_DIR, f"hangar-{e['id']}.desktop")
+    return os.path.join(MENU_DIR, f"vessel-{e['id']}.desktop")
 
 
 def has_shortcut(e, where="menu"):
@@ -1422,11 +1447,11 @@ def shortcut_text(e):
     icon = os.path.join(ICONS, e["icon"]) if e["icon"] else (os.path.join(COVERS, e["cover"]) if e["cover"] else "")
     name = e["name"].replace("\n", " ")
     return ("[Desktop Entry]\nType=Application\n"
-            f"Name={name}\nComment=Run with Hangar\n"
+            f"Name={name}\nComment=Run with Vessel\n"
             f"Exec={shlex.join(self_command() + ['--launch', e['id']])}\n"
             f"Icon={icon or 'applications-games'}\nTerminal=false\n"
             f"Categories={'Game;' if e['kind'] == 'game' else 'Utility;'}\n"
-            f"X-Hangar-Id={e['id']}\n")
+            f"X-Vessel-Id={e['id']}\n")
 
 
 def make_shortcut(e, where="menu"):
@@ -1471,6 +1496,56 @@ def refresh_shortcuts(e):
     for where in ("menu", "desktop"):
         if has_shortcut(e, where):
             make_shortcut(e, where)
+
+
+def migrate_from_hangar():
+    """Vessel was called Hangar until 2.0.0: move ~/.config/hangar and ~/.local/share/hangar over (leaving a link
+    behind, so paths saved in launch options still work) and rewrite the shortcuts it made"""
+    moved = False
+    for new in (CONF_DIR, DATA):
+        old = os.path.join(os.path.dirname(new), "hangar")
+        if os.path.isdir(old) and not os.path.islink(old) and not os.path.exists(new):
+            try:
+                os.rename(old, new)
+                os.symlink(new, old)
+                moved = True
+            except OSError as ex:
+                print(f"vessel: couldn't move {old} to {new}: {ex}", file=sys.stderr)
+    if not moved:
+        return
+    s = settings()
+    old_pfx = os.path.join(HOME, "Games", "Hangar", "prefixes")
+    try:
+        with open(SETTINGS, encoding="utf-8") as f:
+            stored = json.load(f)
+    except (OSError, ValueError):
+        stored = {}
+    if "prefix_root" not in stored and os.path.isdir(old_pfx):
+        save_settings(prefix_root=old_pfx)  # Hangar's default; Vessel's is ~/Games/Vessel/prefixes
+    for e in library():
+        old_menu = os.path.join(MENU_DIR, f"hangar-{e['id']}.desktop")
+        if os.path.exists(old_menu):
+            try:
+                os.remove(old_menu)
+                make_shortcut(e)
+            except OSError:
+                pass
+        if desktop_shortcut_path(e):
+            try:
+                make_shortcut(e, "desktop")
+            except OSError:
+                pass
+    old_opener = os.path.join(MENU_DIR, "hangar-open.desktop")
+    if os.path.exists(old_opener):
+        try:
+            os.remove(old_opener)
+        except OSError:
+            pass
+        if s["exe_opener"]:
+            try:
+                register_opener(True)
+            except OSError:
+                pass
 
 
 # ---- .exe icons --------------------------------------------------------------------------------
@@ -1603,7 +1678,7 @@ SSL = None
 def http_get(url, headers=None, timeout=20):
     global SSL
     SSL = SSL or ssl_context()
-    req = urllib.request.Request(url, headers={"User-Agent": f"Hangar/{VERSION}", **(headers or {})})
+    req = urllib.request.Request(url, headers={"User-Agent": f"Vessel/{VERSION}", **(headers or {})})
     with urllib.request.urlopen(req, timeout=timeout, context=SSL) as r:
         return r.read()
 
@@ -1625,7 +1700,7 @@ def cover_candidates(term, key=""):
                                   "?dimensions=600x900,342x482,660x930&types=static", h).get("data", [])[:8]
                 out += [{"label": g["name"], "url": gr["url"], "thumb": gr.get("thumb") or gr["url"]} for gr in grids]
         except Exception as ex:
-            print(f"hangar: SteamGridDB search failed: {ex}", file=sys.stderr)
+            print(f"vessel: SteamGridDB search failed: {ex}", file=sys.stderr)
     items = http_json("https://store.steampowered.com/api/storesearch/?" +
                       urllib.parse.urlencode({"term": term, "l": "english", "cc": "US"})).get("items", [])[:10]
     for it in items:
@@ -1671,7 +1746,7 @@ def install_proton(source, report):
     os.makedirs(dest, exist_ok=True)
     part = os.path.join(dest, f".{asset['name']}.part")
     digest = hashlib.sha512()
-    req = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": f"Hangar/{VERSION}"})
+    req = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": f"Vessel/{VERSION}"})
     global SSL
     SSL = SSL or ssl_context()
     try:
@@ -1704,24 +1779,24 @@ def version_tuple(v):
 
 
 def check_update(_report=None):
-    """the newest Hangar release on GitHub: {version, newer, url (the AppImage), page}"""
-    rel = http_json(HANGAR_RELEASES)
+    """the newest Vessel release on GitHub: {version, newer, url (the AppImage), page}"""
+    rel = http_json(VESSEL_RELEASES)
     ver = rel["tag_name"].lstrip("v")
     asset = next((a for a in rel.get("assets", []) if a["name"].endswith(".AppImage")), None)
     return {"version": ver, "newer": version_tuple(ver) > version_tuple(VERSION),
             "url": asset["browser_download_url"] if asset else "", "size": asset["size"] if asset else 0,
-            "page": rel.get("html_url") or HANGAR_PAGE}
+            "page": rel.get("html_url") or VESSEL_PAGE}
 
 
 def install_update(info, report):
     """downloads the release's AppImage over the running one (beside it first, then swapped in); returns the version"""
     if not APPIMAGE or not os.path.isfile(APPIMAGE):
-        raise RuntimeError("Hangar isn't running from its AppImage")
+        raise RuntimeError("Vessel isn't running from its AppImage")
     folder = os.path.dirname(APPIMAGE)
     if not os.access(folder, os.W_OK):
         raise RuntimeError(f"can't write to {folder}")
     part = os.path.join(folder, f".{os.path.basename(APPIMAGE)}.part")
-    req = urllib.request.Request(info["url"], headers={"User-Agent": f"Hangar/{VERSION}"})
+    req = urllib.request.Request(info["url"], headers={"User-Agent": f"Vessel/{VERSION}"})
     global SSL
     SSL = SSL or ssl_context()
     try:
@@ -1781,7 +1856,7 @@ class Task(QThread):
 # ---- running -----------------------------------------------------------------------------------
 
 class Launcher(QObject):
-    """keeps track of what Hangar started: playtime, stopping, quick crashes"""
+    """keeps track of what Vessel started: playtime, stopping, quick crashes"""
     changed = pyqtSignal()
     finished = pyqtSignal(str, int, float)
 
@@ -1861,7 +1936,7 @@ class Launcher(QObject):
             self.changed.emit()
 
     def save_running(self):
-        """counts the time so far of everything still running (when Hangar closes)"""
+        """counts the time so far of everything still running (when Vessel closes)"""
         for eid, (_p, start) in self.running.items():
             add_playtime(eid, time.time() - start)
         self.running.clear()
@@ -1937,6 +2012,8 @@ QPushButton#cover:hover {{ border: 2px solid {t['accent']}; }}
 QToolButton {{ background: transparent; color: {t['muted']}; border: none; border-radius: 8px; padding: 4px 8px; font-size: 16px; }}
 QToolButton:hover {{ background: {t['surface2']}; color: {t['text']}; }}
 QToolButton::menu-indicator {{ image: none; }}
+QToolButton#update {{ background: {t['accent']}; color: {t['on_accent']}; font-size: 13px; font-weight: 700; padding: 5px 12px; }}
+QToolButton#update:hover {{ background: {t['accent_hover']}; }}
 QLineEdit, QPlainTextEdit {{ background: {t['surface']}; color: {t['text']}; border: 1px solid {t['border']}; border-radius: 10px; padding: 7px 11px; selection-background-color: {t['accent']}; selection-color: {t['on_accent']}; }}
 QLineEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {t['accent']}; }}
 QComboBox {{ background: {t['surface']}; color: {t['text']}; border: 1px solid {t['border']}; border-radius: 10px; padding: 6px 11px; }}
@@ -2740,7 +2817,7 @@ class EditDialog(QDialog):
             try:
                 make_shortcut(e, "desktop") if want else remove_shortcut(e, "desktop")
             except OSError as ex:
-                QMessageBox.warning(self, "Hangar", f"Couldn't make the desktop shortcut: {ex}")
+                QMessageBox.warning(self, "Vessel", f"Couldn't make the desktop shortcut: {ex}")
         self.accept()
 
 
@@ -2759,12 +2836,12 @@ class SettingsDialog(QDialog):
         self.s = settings()
         self.accent = self.s["accent"]
         self.task = None
-        self.setWindowTitle("Hangar settings")
+        self.setWindowTitle("Vessel settings")
         self.resize(680, 680)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(18, 16, 18, 14)
         outer.setSpacing(12)
-        scroll = QScrollArea()
+        scroll = self.scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         w = QWidget()
@@ -2820,10 +2897,10 @@ class SettingsDialog(QDialog):
             self.size.addItem(k.capitalize(), k)
         self.size.setCurrentIndex(self.size.findData(self.s["size"]))
         look.addRow("Grid covers", self.size)
-        self.close_to_tray = QCheckBox("Closing the window keeps Hangar running in the tray")
+        self.close_to_tray = QCheckBox("Closing the window keeps Vessel running in the tray")
         self.close_to_tray.setChecked(self.s["close_to_tray"])
         tray_ok = QSystemTrayIcon.isSystemTrayAvailable()
-        self.close_to_tray.setToolTip("The X hides Hangar to the system tray (click its icon there to open it again, "
+        self.close_to_tray.setToolTip("The X hides Vessel to the system tray (click its icon there to open it again, "
                                       "or right-click → Quit). " + ("" if tray_ok else
                                                                    "No system tray was found, so the X quits for now."))
         look.addRow("", self.close_to_tray)
@@ -2860,8 +2937,8 @@ class SettingsDialog(QDialog):
         run.addRow("New prefixes go in", prow)
         umu = which("umu-run")
         self.wayland = QComboBox()
-        for v, t in (("auto", "Automatic (on niri only)"), ("on", "Always"), ("off", "Never")):
-            self.wayland.addItem(t, v)
+        for val, t in (("auto", "Automatic (on niri only)"), ("on", "Always"), ("off", "Never")):
+            self.wayland.addItem(t, val)
         self.wayland.setCurrentIndex(max(0, self.wayland.findData(self.s["wayland"])))
         self.wayland.setToolTip("GE-Proton's Wayland mode (PROTON_ENABLE_WAYLAND=1), not for VR games. On niri X11 "
                                 "windows can vanish on a monitor above or left of the main one, so Automatic uses "
@@ -2869,16 +2946,17 @@ class SettingsDialog(QDialog):
                                 "program allows it. For one game, put PROTON_ENABLE_WAYLAND=0 or 1 in its "
                                 "Environment.")
         run.addRow("Proton games as Wayland windows", self.wayland)
-        self.exe_opener = QCheckBox("Open .exe files with Hangar (double-click one to run it)")
+        self.exe_opener = QCheckBox("Open .exe files with Vessel (double-click one to run it)")
         self.exe_opener.setChecked(self.s["exe_opener"])
-        self.exe_opener.setToolTip("Hangar becomes the app for Windows programs: opening one from your file manager "
+        self.exe_opener.setToolTip("Vessel becomes the app for Windows programs: opening one from your file manager "
                                    "shows a small window to run it with Proton or Wine, and add it to the library "
                                    "if you like.")
         run.addRow("", self.exe_opener)
         self.use_umu = QCheckBox("Use umu-launcher for Proton" + ("" if umu else " (not installed)"))
         self.use_umu.setChecked(self.s["use_umu"])
         self.use_umu.setToolTip("umu runs Proton inside Steam's runtime, like Steam does. Without it, Proton runs "
-                                "directly, which works for most games.")
+                                "directly, which works for most games. Games that ship Steam's DLL (steam_api.dll) always run "
+                                "directly, so they can reach the Steam client.")
         run.addRow("", self.use_umu)
         wt = which("winetricks")
         wrow = QHBoxLayout()
@@ -2951,7 +3029,7 @@ class SettingsDialog(QDialog):
         note.linkActivated.connect(open_path)
         covers.addRow("", note)
         urow = QHBoxLayout()
-        urow.addWidget(label(f"Hangar {VERSION} · library in {CONF_DIR}", "muted", wrap=True), 1)
+        urow.addWidget(label(f"Vessel {VERSION} · library in {CONF_DIR}", "muted", wrap=True), 1)
         self.update_btn = button("Check for updates", self.check_updates)
         urow.addWidget(self.update_btn)
         v.addLayout(urow)
@@ -3051,7 +3129,7 @@ class SettingsDialog(QDialog):
 
     def check_updates(self):
         if self.update_info and self.update_info.get("ready"):
-            return restart_hangar()
+            return restart_vessel()
         if self.update_info and self.update_info["newer"] and self.update_info["url"] and APPIMAGE:
             return self.download_update()
         self.update_btn.setEnabled(False)
@@ -3067,12 +3145,12 @@ class SettingsDialog(QDialog):
         self.update_info = info
         page = f'<a href="{info["page"]}">release page</a>'
         if not info["newer"]:
-            return self.update_say(f"Hangar {VERSION} is the newest version.")
+            return self.update_say(f"Vessel {VERSION} is the newest version.")
         if info["url"] and APPIMAGE:
             self.update_btn.setText(f"Update to {info['version']}")
-            self.update_say(f"Hangar {info['version']} is out ({page}).")
+            self.update_say(f"Vessel {info['version']} is out ({page}).")
         else:
-            self.update_say(f"Hangar {info['version']} is out: get it from the {page}.")
+            self.update_say(f"Vessel {info['version']} is out: get it from the {page}.")
 
     def download_update(self):
         self.update_btn.setEnabled(False)
@@ -3089,7 +3167,7 @@ class SettingsDialog(QDialog):
         if total:
             self.update_bar.setRange(0, 1000)
             self.update_bar.setValue(int(done * 1000 / total))
-        self.update_say(f"Downloading Hangar {ver}: {done >> 20} / {total >> 20} MB")
+        self.update_say(f"Downloading Vessel {ver}: {done >> 20} / {total >> 20} MB")
 
     def update_done(self, ver, error):
         self.update_btn.setEnabled(True)
@@ -3097,8 +3175,8 @@ class SettingsDialog(QDialog):
         if error:
             return self.update_say(f"Couldn't update: {error}")
         self.update_info["ready"] = True
-        self.update_btn.setText("Restart Hangar")
-        self.update_say(f"Hangar {ver} is installed. Restart Hangar to use it (unsaved settings here are lost).")
+        self.update_btn.setText("Restart Vessel")
+        self.update_say(f"Vessel {ver} is installed. Restart Vessel to use it (unsaved settings here are lost).")
 
     def proton_done(self, source, tag, error):
         self.ge_btn.setEnabled(True)
@@ -3429,7 +3507,7 @@ class DropOverlay(QFrame):
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Hangar")
+        self.setWindowTitle("Vessel")
         self.resize(1100, 720)
         self.setMinimumSize(700, 460)
         self.setAcceptDrops(True)
@@ -3455,7 +3533,7 @@ class Window(QMainWindow):
         head.addWidget(icon)
         titles = QVBoxLayout()
         titles.setSpacing(1)
-        titles.addWidget(label("Hangar", "title"))
+        titles.addWidget(label("Vessel", "title"))
         self.subtitle = label("", "muted")
         titles.addWidget(self.subtitle)
         head.addLayout(titles)
@@ -3465,6 +3543,12 @@ class Window(QMainWindow):
         head.addSpacing(6)
         self.add_btn = button("", self.add, "primary")
         head.addWidget(self.add_btn)
+        self.upd_btn = QToolButton()
+        self.upd_btn.setText("⟳")
+        self.upd_btn.setToolTip("Check for updates")
+        self.upd_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.upd_btn.clicked.connect(lambda: self.open_settings(check_updates=True))
+        head.addWidget(self.upd_btn)
         gear = QToolButton()
         gear.setText("⚙")
         gear.setToolTip("Settings")
@@ -3525,12 +3609,13 @@ class Window(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self, self.search.setFocus)
         QShortcut(QKeySequence("Ctrl+N"), self, self.add)
         QShortcut(QKeySequence("F5"), self, self.refresh)
-        # NSFW: unlocked until you leave the tab or Hangar is hidden; a hidden tab shows with the key
+        # NSFW: unlocked until you leave the tab or Vessel is hidden; a hidden tab shows with the key
         self.nsfw_unlocked = False
         self.nsfw_shown = False
         self.nsfw_shortcut = QShortcut(QKeySequence(settings()["nsfw_key"] or "Ctrl+Shift+N"), self,
                                        self.toggle_nsfw_tab)
         self.refresh()
+        QTimer.singleShot(3000, self.quiet_update_check)
 
     # helpers
     def say(self, text, secs=7):
@@ -3577,7 +3662,7 @@ class Window(QMainWindow):
         self.refresh()
 
     def lock_nsfw(self):
-        """hiding Hangar locks NSFW again and hides a hidden tab"""
+        """hiding Vessel locks NSFW again and hides a hidden tab"""
         if self.nsfw_unlocked or self.nsfw_shown:
             self.nsfw_unlocked = False
             self.nsfw_shown = False
@@ -3834,7 +3919,7 @@ class Window(QMainWindow):
         task.start()
 
     def import_paths(self, paths):
-        """what dropping on the window (or opening files with Hangar) does"""
+        """what dropping on the window (or opening files with Vessel) does"""
         archives = [p for p in paths if os.path.isfile(p) and is_archive(p)]
         folders = [p for p in paths if os.path.isdir(p)]
         programs = [p for p in paths if os.path.isfile(p) and p not in archives and not LATER_PART_RE.search(p)]
@@ -3846,7 +3931,7 @@ class Window(QMainWindow):
             if is_windows(p) and is_installer(p):
                 r = QMessageBox.question(self, "Run the installer?",
                                          f"{os.path.basename(p)} looks like an installer.\n\nRun it in a new prefix "
-                                         "now? When it finishes, Hangar finds the installed game and adds it.\n\n"
+                                         "now? When it finishes, Vessel finds the installed game and adds it.\n\n"
                                          "No adds the file itself as the program.")
                 if r == QMessageBox.StandardButton.Yes:
                     self.run_installer(p, guess_name(p))
@@ -3924,7 +4009,7 @@ class Window(QMainWindow):
         if best and is_installer(best) and not any(not is_installer(p) for p in programs):
             r = QMessageBox.question(self, "Run the installer?",
                                      f"{name} comes as an installer ({os.path.basename(best)}).\n\nRun it in a new "
-                                     "prefix now? When it finishes, Hangar finds the installed game and adds it.")
+                                     "prefix now? When it finishes, Vessel finds the installed game and adds it.")
             if r == QMessageBox.StandardButton.Yes:
                 self.run_installer(best, name)
                 return
@@ -3950,7 +4035,7 @@ class Window(QMainWindow):
         except (LaunchError, OSError) as ex:
             QMessageBox.warning(self, "Can't run the installer", str(ex))
             return
-        self.say(f"Installing {name}: finish the installer, then Hangar asks what to add. "
+        self.say(f"Installing {name}: finish the installer, then Vessel asks what to add. "
                  "(A new prefix takes a minute to set up first.)", 30)
         timer = QTimer(self)
 
@@ -3963,7 +4048,7 @@ class Window(QMainWindow):
             programs = [x for x in find_programs(drive, newer_than=started - 5, max_depth=7) if not is_installer(x)]
             preset = dict(e, exe=programs[0] if programs else "")
             if not programs:
-                self.say("The installer finished, but Hangar couldn't tell what it installed: pick the program "
+                self.say("The installer finished, but Vessel couldn't tell what it installed: pick the program "
                          "with Browse (it starts in the prefix's C: drive).", 15)
             d = EditDialog(self, kind=e["kind"], preset=preset, start_dir=drive)
             if d.exec():
@@ -4057,7 +4142,7 @@ class Window(QMainWindow):
             return
         box = QMessageBox(self)
         box.setWindowTitle("Remove")
-        box.setText(f"Remove {e['name']} from Hangar?")
+        box.setText(f"Remove {e['name']} from Vessel?")
         box.setInformativeText("The program's own files stay where they are.")
         cb = None
         pfx = prefix_of(e)
@@ -4165,8 +4250,27 @@ class Window(QMainWindow):
         lay.addLayout(row)
         d.exec()
 
-    def open_settings(self):
-        if SettingsDialog(self).exec():
+    def quiet_update_check(self):
+        """asks GitHub once at start; a newer version turns the ⟳ button into "Update to X" """
+        self.upd_task = Task(check_update, self)
+        self.upd_task.done.connect(self.quiet_update_checked)
+        self.upd_task.start()
+
+    def quiet_update_checked(self, info, error):
+        if not error and info and info["newer"]:
+            self.upd_btn.setText(f"⬆  Update to {info['version']}")
+            self.upd_btn.setToolTip(f"Vessel {info['version']} is out (you have {VERSION})")
+            self.upd_btn.setObjectName("update")
+            self.upd_btn.style().unpolish(self.upd_btn)
+            self.upd_btn.style().polish(self.upd_btn)
+
+    def open_settings(self, check_updates=False):
+        d = SettingsDialog(self)
+        if check_updates:
+            d.check_updates()
+            bar = d.scroll.verticalScrollBar()  # the updates part is at the bottom
+            bar.rangeChanged.connect(lambda _lo, hi: bar.setValue(hi))
+        if d.exec():
             apply_theme(QApplication.instance())
             self.nsfw_shortcut.setKey(QKeySequence(settings()["nsfw_key"] or "Ctrl+Shift+N"))
         self.refresh()
@@ -4194,13 +4298,13 @@ class Window(QMainWindow):
         if getattr(self, "tray", None) is None:
             icon = QApplication.instance().windowIcon()
             if icon.isNull():
-                icon = QIcon(placeholder("Hangar", 64, 64))
+                icon = QIcon(placeholder("Vessel", 64, 64))
             self.tray = QSystemTrayIcon(icon, self)
-            self.tray.setToolTip("Hangar")
+            self.tray.setToolTip("Vessel")
             menu = QMenu(self)
-            menu.addAction("Open Hangar", self.show_window)
+            menu.addAction("Open Vessel", self.show_window)
             menu.addSeparator()
-            menu.addAction("Quit Hangar", self.quit_hangar)
+            menu.addAction("Quit Vessel", self.quit_vessel)
             self.tray.setContextMenu(menu)
             self.tray.activated.connect(self.tray_clicked)
         return self.tray
@@ -4218,7 +4322,7 @@ class Window(QMainWindow):
         self.raise_()
         self.activateWindow()
 
-    def quit_hangar(self):
+    def quit_vessel(self):
         self.quitting = True
         if self.close():
             QApplication.quit()
@@ -4245,15 +4349,15 @@ class Window(QMainWindow):
             e.ignore()
             if not getattr(self, "told_tray", False):
                 self.told_tray = True
-                tray.showMessage("Hangar is still running", "It's in the tray: click the icon to open it again, "
-                                 "or right-click → Quit Hangar. (Settings can turn this off.)",
+                tray.showMessage("Vessel is still running", "It's in the tray: click the icon to open it again, "
+                                 "or right-click → Quit Vessel. (Settings can turn this off.)",
                                  QSystemTrayIcon.MessageIcon.Information, 5000)
             return
         if self.launcher.running:
             names = ", ".join(get_entry(i)["name"] for i in self.launcher.running if get_entry(i))
             r = QMessageBox.question(self, "Still running",
                                      f"{names} {'is' if len(self.launcher.running) == 1 else 'are'} still running. "
-                                     "Close Hangar anyway? They keep running; playtime is counted up to now.")
+                                     "Close Vessel anyway? They keep running; playtime is counted up to now.")
             if r != QMessageBox.StandardButton.Yes:
                 e.ignore()
                 return
@@ -4346,7 +4450,7 @@ class LoadingRing(QWidget):
 
 
 class QuickRun(QDialog):
-    """opening a program with Hangar (from the file manager, or `hangar FILE.exe`): its icon and name,
+    """opening a program with Vessel (from the file manager, or `vessel FILE.exe`): its icon and name,
     what runs it, and Run. It can go into the library too; a program already there runs as set up"""
 
     def __init__(self, path):
@@ -4582,9 +4686,9 @@ class QuickRun(QDialog):
 
 
 def cli_run(path):
-    """`hangar --run FILE`: runs it right away (its library entry if it has one), no window"""
+    """`vessel --run FILE`: runs it right away (its library entry if it has one), no window"""
     if not os.path.isfile(path):
-        print(f"hangar: no such file {path}", file=sys.stderr)
+        print(f"vessel: no such file {path}", file=sys.stderr)
         return 1
     e, known = quick_entry(path)
     if known:
@@ -4594,8 +4698,8 @@ def cli_run(path):
     try:
         p = start_process(e, log_name="quick")
     except (LaunchError, OSError) as ex:
-        print(f"hangar: can't run {path}: {ex}", file=sys.stderr)
-        subprocess.run(["notify-send", "-a", "Hangar", f"Can't run {os.path.basename(path)}", str(ex)], env=host_env(),
+        print(f"vessel: can't run {path}: {ex}", file=sys.stderr)
+        subprocess.run(["notify-send", "-a", "Vessel", f"Can't run {os.path.basename(path)}", str(ex)], env=host_env(),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         return 1
     try:
@@ -4610,9 +4714,9 @@ def cli_busy(e):
     stuck (and Proton would wait for that forever). Says so instead of starting nothing; True: busy"""
     if not prefix_procs(e):
         return False
-    msg = "It's open already, or its last run is stuck. Open it from Hangar to stop that and start again."
-    print(f"hangar: {e['name']} is still running. {msg}", file=sys.stderr)
-    subprocess.run(["notify-send", "-a", "Hangar", f"{e['name']} is still running", msg], env=host_env(),
+    msg = "It's open already, or its last run is stuck. Open it from Vessel to stop that and start again."
+    print(f"vessel: {e['name']} is still running. {msg}", file=sys.stderr)
+    subprocess.run(["notify-send", "-a", "Vessel", f"{e['name']} is still running", msg], env=host_env(),
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     return True
 
@@ -4620,7 +4724,7 @@ def cli_busy(e):
 def cli_launch(eid):
     e = get_entry(eid)
     if not e:
-        print(f"hangar: no entry {eid}", file=sys.stderr)
+        print(f"vessel: no entry {eid}", file=sys.stderr)
         return 1
     if cli_busy(e):
         return 1
@@ -4629,8 +4733,8 @@ def cli_launch(eid):
     try:
         p = start_process(e)
     except (LaunchError, OSError) as ex:
-        print(f"hangar: can't start {e['name']}: {ex}", file=sys.stderr)
-        subprocess.run(["notify-send", "-a", "Hangar", f"Can't start {e['name']}", str(ex)], env=host_env(),
+        print(f"vessel: can't start {e['name']}: {ex}", file=sys.stderr)
+        subprocess.run(["notify-send", "-a", "Vessel", f"Can't start {e['name']}", str(ex)], env=host_env(),
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         return 1
     start = time.time()
@@ -4645,8 +4749,8 @@ def cli_launch(eid):
 
 
 def cli_check():
-    """prints what Hangar finds on this PC, and whether downloads work"""
-    print(f"Hangar {VERSION}")
+    """prints what Vessel finds on this PC, and whether downloads work"""
+    print(f"Vessel {VERSION}")
     pv = proton_versions()
     print(f"Proton ({len(pv)}): " + (", ".join(v["name"] for v in pv) or "none") + f"\n  default: {default_proton() or '-'}")
     wv = wine_versions()
@@ -4665,11 +4769,11 @@ def cli_check():
 
 
 INSTANCE = None
-INSTANCE_SOCKET = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/hangar-{os.getuid()}", "hangar.sock")
+INSTANCE_SOCKET = os.path.join(os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/vessel-{os.getuid()}", "vessel.sock")
 
 
 def hand_over(paths):
-    """True when another Hangar is running: it was told to show itself (and to import `paths`)"""
+    """True when another Vessel is running: it was told to show itself (and to import `paths`)"""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as c:
             c.settimeout(1)
@@ -4681,7 +4785,7 @@ def hand_over(paths):
 
 
 class InstanceServer(QObject):
-    """a Unix socket other Hangar starts talk to (Qt's QLocalServer would pull QtNetwork into the AppImage)"""
+    """a Unix socket other Vessel starts talk to (Qt's QLocalServer would pull QtNetwork into the AppImage)"""
 
     def __init__(self, win):
         super().__init__(win)
@@ -4743,6 +4847,8 @@ def listen(win):
 
 
 def main():
+    if not (len(sys.argv) >= 2 and sys.argv[1] in ("-h", "--help", "-v", "--version")):
+        migrate_from_hangar()
     if len(sys.argv) >= 2 and sys.argv[1] == "--check":
         sys.exit(cli_check())
     if len(sys.argv) >= 3 and sys.argv[1] == "--launch":
@@ -4753,11 +4859,11 @@ def main():
         print(__doc__)
         return
     if len(sys.argv) >= 2 and sys.argv[1] in ("-v", "--version"):
-        print(f"Hangar {VERSION}")
+        print(f"Vessel {VERSION}")
         return
     app = QApplication(sys.argv)
-    app.setApplicationName("hangar")
-    app.setDesktopFileName("hangar")
+    app.setApplicationName("vessel")
+    app.setDesktopFileName("vessel")
     if os.path.exists(ICON):
         app.setWindowIcon(QIcon(ICON))
     apply_theme(app)
@@ -4769,14 +4875,14 @@ def main():
             pass
     args = [a for a in sys.argv[1:] if a != "--open"]
     paths = [os.path.abspath(a) for a in args if os.path.exists(a)]
-    # one program opened from the file manager (or `hangar FILE.exe`): the small run window, PortProton-style
+    # one program opened from the file manager (or `vessel FILE.exe`): the small run window, PortProton-style
     if len(paths) == 1 and os.path.isfile(paths[0]) and not is_archive(paths[0]) \
             and (is_windows(paths[0]) or "--open" in sys.argv):
         d = QuickRun(paths[0])
         d.show()
         app.setQuitOnLastWindowClosed(True)
         sys.exit(app.exec())
-    # one Hangar at a time: starting it again (menu, dock, file manager) brings back the running one,
+    # one Vessel at a time: starting it again (menu, dock, file manager) brings back the running one,
     # which may be hidden in the tray, and hands it the files
     if hand_over(paths):
         return
