@@ -12,22 +12,21 @@ permissions:
 
 jobs:
   build:
-    # the oldest supported Ubuntu: the bundled Python and libraries then run on most distros
+    # the oldest supported Ubuntu: a binary built against its glibc runs on most distros
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils libarchive-tools \
-            libegl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libfontconfig1
+          sudo apt-get install -y libarchive-tools
 
       - name: Get appimagetool
         run: |
@@ -45,7 +44,8 @@ jobs:
         run: |
           ./dist/Vessel-x86_64.AppImage --appimage-extract >/dev/null
           ./squashfs-root/AppRun --version
-          ./squashfs-root/usr/bin/bsdtar --version
+          ./squashfs-root/usr/lib/bsdtar/run --version
+          ./squashfs-root/AppRun --check || true
 
       - uses: actions/upload-artifact@v5
         with:

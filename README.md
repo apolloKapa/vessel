@@ -2,6 +2,8 @@
 
 A launcher for the games and apps you have outside Steam, for Linux.
 
+*Vessel 3.0 is written in Rust (it was Python and PyQt6 until 2.0.0): one small binary that needs nothing but glibc. It reads the same `library.json` and `settings.json`, so updating keeps everything.*
+
 *Vessel was called **Hangar** until 2.0.0. The first start moves `~/.config/hangar` and `~/.local/share/hangar` to the new folders (leaving links behind) and rewrites its menu and desktop shortcuts; the old Hangar's "Check for updates" finds Vessel too.*
 
 - **Anything runs:** Windows `.exe`/`.msi`/`.bat` files through **Proton** (the newest GE-Proton by default) or **Wine**, and native programs, AppImages, scripts or plain commands (`flatpak run …`) as they are.
@@ -14,6 +16,7 @@ A launcher for the games and apps you have outside Steam, for Linux.
 - **Wayland windows:** Settings → Proton games as Wayland windows: Automatic (the default) uses GE-Proton's Wayland mode on niri, where X11 windows can get lost on a monitor above or left of the main one, and X11 elsewhere, where the compositor can resize any window (a Wayland window only resizes if the program allows it). Always and Never are there too; VR games stay on X11 (Proton's VR bridge needs it), and one game can choose with `PROTON_ENABLE_WAYLAND=0` or `1` in its Environment.
 - **Starting:** Run and Play show a loading ring until the program's window appears (on Hyprland and niri, which can say when it does); a program that closes right away says so, with its log. Anything still running in a game's prefix (it's open already, or its last run crashed or hung) would keep it from starting, since Proton waits for it: Vessel asks to stop that first.
 - **Anti-cheat:** per-game EasyAntiCheat and BattlEye toggles load Steam's free Proton EasyAntiCheat / BattlEye Runtime (from any Steam library, or Heroic's), for games whose anti-cheat allows Linux. Vessel ticks them when the game's folder ships EAC or BattlEye.
+- **The window** opens through XWayland on Wayland desktops, because its toolkit (egui/winit) only takes dropped files from X11. `VESSEL_WAYLAND=1` makes it a native Wayland window, without drag and drop.
 - **Stays in the tray:** closing the window hides Vessel to the system tray (click the icon to bring it back, right-click → Quit Vessel); Settings → Appearance turns it off. Starting Vessel again shows the running one instead of opening a second.
 - **Per game:** its own prefix, start folder, environment variables, a command prefix (`gamescope -f --`), MangoHud and GameMode. Prefix tools: winecfg, regedit, winetricks (downloadable from Settings), running another `.exe` in the prefix, stopping it.
 - **Drop to add:** drop a `.zip`/`.rar`/`.7z`/`.tar` archive and it's unpacked into your games folder (`~/Games/<Name>`, changeable) and the Add dialog opens with the main program already picked. Drop a folder to copy or move it there (or use it in place). Drop an installer (`setup.exe`) to run it in a new prefix; when it finishes, Vessel finds what it installed. Drop files on a game to put them in its folder (mods, patches), unpacking archives into it if you like; a single image sets the cover. RAR, 7z and the rest unpack with the bundled bsdtar, or the system's unrar/7z when it has them.
@@ -22,7 +25,7 @@ A launcher for the games and apps you have outside Steam, for Linux.
 
 ## Get it
 
-Download `Vessel-x86_64.AppImage` from the latest release, `chmod +x` it and run it. Without the AppImage: `pip install PyQt6 certifi` and run `./vessel.py`. To update later, click the ⟳ button at the top (it turns into "Update to X" when a new version is out) or **Check for updates** at the bottom of Settings: it downloads the newest release over the AppImage and restarts Vessel.
+Download `Vessel-x86_64.AppImage` from the latest release, `chmod +x` it and run it. Without the AppImage: `cargo build --release` and run `target/release/vessel`. To update later, click the ⟳ button at the top (it turns into "Update to X" when a new version is out) or **Check for updates** at the bottom of Settings: it downloads the newest release over the AppImage and restarts Vessel.
 
 `vessel --check` prints the Proton/Wine versions and tools Vessel finds. `vessel --launch ID` runs one entry without the window (menu and desktop shortcuts use it). `vessel FILE.exe` opens the run window for a program; `vessel --run FILE` runs it without one.
 
@@ -39,6 +42,6 @@ With [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) instal
 
 ## Building
 
-`./build_appimage.sh` (needs `appimagetool`; `--appdir` stops before it). GitHub Actions builds the AppImage on every `v*` tag and attaches it to the release.
+`./build_appimage.sh` (needs Rust's `cargo`, `bsdtar` and `appimagetool`; `--appdir` stops before appimagetool). `cargo test` runs the tests. GitHub Actions builds the AppImage on every `v*` tag and attaches it to the release.
 
 MIT licensed.

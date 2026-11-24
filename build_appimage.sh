@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Builds dist/Vessel-x86_64.AppImage: a PyInstaller bundle (Python + PyQt6 + certifi) in an AppDir, with
-# its own bsdtar for unpacking dropped archives (.zip/.rar/.7z/.tar).
-# GitHub Actions runs this on every v* tag (.github/workflows/appimage.yml); locally it needs
-# python3, bsdtar and appimagetool (APPIMAGETOOL=/path/to/appimagetool, or on PATH).
+# Builds dist/Vessel-x86_64.AppImage: the Rust binary in an AppDir, with its own bsdtar for unpacking dropped
+# archives (.zip/.rar/.7z/.tar). The binary only needs glibc: X11, Wayland, OpenGL and D-Bus are loaded from
+# the desktop at run time, and HTTPS uses rustls with its own certificates.
+# GitHub Actions runs this on every v* tag (.github/workflows/appimage.yml); locally it needs cargo, bsdtar and
+# appimagetool (APPIMAGETOOL=/path/to/appimagetool, or on PATH).
 #   ./build_appimage.sh            full build
 #   ./build_appimage.sh --appdir   stop after the AppDir (no appimagetool needed)
 set -euo pipefail
@@ -10,59 +11,24 @@ cd "$(dirname "$0")"
 
 BUILD=build/appimage
 APPDIR="$BUILD/Vessel.AppDir"
-VENV="$BUILD/venv"
 VERSION="${VESSEL_VERSION:-$(git describe --tags --always 2>/dev/null || echo dev)}"
-PYTHON="${PYTHON:-python3}"
 
-[ -x "$VENV/bin/python" ] || "$PYTHON" -m venv "$VENV"
-"$VENV/bin/python" -m pip install -q --upgrade pip
-"$VENV/bin/python" -m pip install -q pyinstaller PyQt6 certifi
-
-# the icon, rendered from the SVG
-QT_QPA_PLATFORM=offscreen "$VENV/bin/python" - vessel.svg "$BUILD/vessel.png" <<'PY'
-import sys
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QGuiApplication, QImage, QPainter
-from PyQt6.QtSvg import QSvgRenderer
-app = QGuiApplication(sys.argv)
-img = QImage(256, 256, QImage.Format.Format_ARGB32)
-img.fill(Qt.GlobalColor.transparent)
-p = QPainter(img)
-QSvgRenderer(sys.argv[1]).render(p)
-p.end()
-img.save(sys.argv[2])
-PY
-
-mkdir -p "$BUILD"
-"$VENV/bin/pyinstaller" --noconfirm --clean --onedir --name vessel \
-    --distpath "$BUILD/dist" --workpath "$BUILD/work" --specpath "$BUILD" \
-    --add-data "$PWD/vessel.svg:." \
-    --hidden-import certifi --collect-data certifi \
-    --exclude-module tkinter \
-    --exclude-module PyQt6.QtQml --exclude-module PyQt6.QtQuick --exclude-module PyQt6.QtPdf \
-    --exclude-module PyQt6.QtMultimedia --exclude-module PyQt6.QtWebEngineCore \
-    --exclude-module PyQt6.QtDesigner --exclude-module PyQt6.QtNetwork \
-    vessel.py
-
-INTERNAL="$BUILD/dist/vessel/_internal"
-rm -rf "$INTERNAL/PyQt6/Qt6/translations"
-rm -f "$INTERNAL/PyQt6/Qt6/plugins/platformthemes/libqgtk3.so"
-# libraries AppImages take from the host (the AppImage excludelist)
-for lib in libfontconfig.so.1 libfreetype.so.6 libexpat.so.1 libz.so.1 libuuid.so.1 \
-           libX11.so.6 libX11-xcb.so.1 libxcb.so.1 libXau.so.6 libXdmcp.so.6 libXext.so.6 \
-           libXrender.so.1 libstdc++.so.6 libgcc_s.so.1 libGL.so.1 libGLX.so.0 libGLdispatch.so.0 \
-           libEGL.so.1 libgbm.so.1 libdrm.so.2 libasound.so.2; do
-    rm -f "$INTERNAL/$lib"
-done
+cargo build --release --locked
+BIN=target/release/vessel
 
 rm -rf "$APPDIR"
-mkdir -p "$APPDIR/usr/lib" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/256x256/apps"
-cp -r "$BUILD/dist/vessel" "$APPDIR/usr/lib/vessel"
-cp LICENSE "$APPDIR/usr/lib/vessel/LICENSE"
+mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib/bsdtar" "$APPDIR/usr/share/applications" \
+         "$APPDIR/usr/share/icons/hicolor/256x256/apps" "$APPDIR/usr/share/licenses/vessel"
+cp "$BIN" "$APPDIR/usr/bin/vessel"
+cp LICENSE "$APPDIR/usr/share/licenses/vessel/LICENSE"
+
+# the icon, rendered from vessel.svg by Vessel itself
+"$BIN" --render-icon 256 "$APPDIR/vessel.png"
+cp "$APPDIR/vessel.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/vessel.png"
+ln -sf vessel.png "$APPDIR/.DirIcon"
 
 # bsdtar with the libraries it needs that a desktop may not have (not glibc's own)
 BSDTAR="$(command -v bsdtar)"
-mkdir -p "$APPDIR/usr/lib/bsdtar" "$APPDIR/usr/bin"
 cp "$BSDTAR" "$APPDIR/usr/lib/bsdtar/bsdtar"
 ldd "$BSDTAR" | awk '/=> \//{print $3}' | while read -r so; do
     case "$(basename "$so")" in
@@ -70,16 +36,13 @@ ldd "$BSDTAR" | awk '/=> \//{print $3}' | while read -r so; do
         *) cp -L "$so" "$APPDIR/usr/lib/bsdtar/" ;;
     esac
 done
-cat > "$APPDIR/usr/bin/bsdtar" <<'SH'
+cat > "$APPDIR/usr/lib/bsdtar/run" <<'SH'
 #!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")/../lib/bsdtar"
+HERE="$(dirname "$(readlink -f "$0")")"
 LD_LIBRARY_PATH="$HERE${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec "$HERE/bsdtar" "$@"
 SH
-chmod +x "$APPDIR/usr/bin/bsdtar"
+chmod +x "$APPDIR/usr/lib/bsdtar/run"
 
-cp "$BUILD/vessel.png" "$APPDIR/vessel.png"
-cp "$BUILD/vessel.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/vessel.png"
-ln -sf vessel.png "$APPDIR/.DirIcon"
 cat > "$APPDIR/vessel.desktop" <<DESK
 [Desktop Entry]
 Type=Application
@@ -100,7 +63,7 @@ cat > "$APPDIR/AppRun" <<'SH'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
 # the bundled bsdtar, for unpacking dropped archives (kept off PATH so games don't see it)
-VESSEL_BSDTAR="$HERE/usr/bin/bsdtar" exec "$HERE/usr/lib/vessel/vessel" "$@"
+VESSEL_BSDTAR="$HERE/usr/lib/bsdtar/run" exec "$HERE/usr/bin/vessel" "$@"
 SH
 chmod +x "$APPDIR/AppRun"
 

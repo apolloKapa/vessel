@@ -1,0 +1,38 @@
+[package]
+name = "vessel"
+version = "3.0.0"
+edition = "2024"
+description = "A launcher for the games and apps you have outside Steam, for Linux"
+license = "MIT"
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "accesskit"] }
+egui = "0.37"
+winit = { version = "0.30", default-features = false, features = ["x11", "wayland"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "ico", "gif"] }
+resvg = { version = "0.50", default-features = false }
+serde_json = { version = "1", features = ["preserve_order"] }
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+rfd = { version = "0.18", default-features = false, features = ["xdg-portal", "pollster"] }
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+scrypt = { version = "0.12", default-features = false }
+pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
+sha2 = "0.11"
+md-5 = "0.11"
+hex = "0.4"
+regex = "1"
+libc = "0.2"
+getrandom = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 4
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[dev-dependencies]
+egui_kittest = { version = "0.37", features = ["wgpu", "snapshot"] }
